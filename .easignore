@@ -1,0 +1,12 @@
+# Không ảnh hưởng code chạy — chỉ giảm dung lượng upload lên EAS
+node_modules/
+.expo/
+dist/
+mnt/
+*.log
+cloudflared.exe
+push_to_github.bat
+agent-transcripts/
+terminals/
+canvases/
+scripts/process-*.mjs

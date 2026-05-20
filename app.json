@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "AI Robotic",
+    "slug": "ai-robotic-manager",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#066071"
+    },
+    "extra": {
+      "apiUrl": "https://YOUR_BACKEND_URL/api"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.air.components.manager"
+    },
+    "android": {
+      "package": "com.air.components.manager",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#066071"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AI Robotic cần quyền Camera để quét mã vạch linh kiện."
+        }
+      ]
+    ]
+  }
+}

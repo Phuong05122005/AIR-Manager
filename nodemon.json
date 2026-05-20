@@ -1,0 +1,13 @@
+{
+  "ignore": [
+    ".expo/*",
+    "dist/*",
+    "node_modules/*",
+    "*.log",
+    ".git/*"
+  ],
+  "watch": [
+    "server.js",
+    "src/**/*"
+  ]
+}
