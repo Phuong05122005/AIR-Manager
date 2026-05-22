@@ -13,9 +13,14 @@
       "backgroundColor": "#066071"
     },
     "extra": {
-      "apiUrl": "https://YOUR_BACKEND_URL/api"
+      "apiUrl": "https://air-manager-api.onrender.com/api",
+      "eas": {
+        "projectId": "6f5e71f6-2359-4a58-8b77-81ef21c850a9"
+      }
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.air.components.manager"
@@ -26,7 +31,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#066071"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro"

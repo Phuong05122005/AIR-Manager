@@ -127,6 +127,7 @@ const formatDate = (date) => {
 // ─── Modal tạo phiếu mượn mới ─────────────────────────────────────────────────
 const BorrowModal = ({ visible, onClose, onSuccess }) => {
   const { user, role } = useAuth();
+  const navigation = useNavigation();
   const [kits, setKits] = useState([]);
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({
@@ -228,13 +229,16 @@ const BorrowModal = ({ visible, onClose, onSuccess }) => {
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalBody}>
-          {/* Scan camera giả lập */}
+          {/* Nút mở camera quét QR thật */}
           <TouchableOpacity
             style={styles.scanBtn}
-            onPress={() => Alert.alert('📷 Camera', 'Tính năng quét mã vạch đang được kích hoạt.\nTrên thiết bị thật, expo-camera sẽ mở camera để quét mã Hộp Kit.')}
+            onPress={() => {
+              onClose(); // Đóng modal trước
+              navigation.navigate('QRScan');
+            }}
           >
             <Text style={{ fontSize: 24 }}>📷</Text>
-            <Text style={styles.scanText}>Quét mã vạch Hộp Kit</Text>
+            <Text style={styles.scanText}>Quét mã QR Hộp Kit</Text>
           </TouchableOpacity>
 
           <FieldLabel label="Hộp Kit (*)" />

@@ -31,8 +31,8 @@ const KitComponentsScreen = () => {
   const { width } = useWindowDimensions();
   const containerWidth = Math.min(width, 800);
   const PADDING = 24; // SPACING.xl
-  // Trừ hao thêm một chút (GAP * 2.5) để đảm bảo không bị rớt dòng do sai số làm tròn pixel
-  const ITEM_WIDTH = Math.floor((containerWidth - (PADDING * 2) - (GAP * 2.5)) / 3);
+  // Tính toán width cho mỗi item để vừa đúng 3 item trên 1 hàng
+  const ITEM_WIDTH = Math.floor((containerWidth - (PADDING * 2) - (GAP * 2)) / 3) - 1;
 
   const previewCode = editName.trim()
     ? generateComponentCode(editName.trim(), components, selectedComponent?.id)
@@ -129,7 +129,7 @@ const KitComponentsScreen = () => {
 
       <Text style={styles.subTitle}>{kit.name} - {kit.topic}</Text>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.gridContainer}>
           {assignCodesToComponents(components).map((comp) => (
             <TouchableOpacity 

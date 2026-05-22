@@ -118,11 +118,11 @@ const UserDashboardScreen = () => {
           <Text style={styles.name}>{user.name}</Text>
         </View>
 
-        {/* Nút Mượn/Trả */}
+        {/* Nút Quét QR → Mượn Kit */}
         <TouchableOpacity 
           style={styles.ctaButtonWrapper}
           activeOpacity={0.8}
-          onPress={() => navigation.navigate('Borrow')}
+          onPress={() => navigation.navigate('QRScan')}
         >
           <LinearGradient
             colors={[COLORS.primary, COLORS.teal]}
@@ -130,9 +130,9 @@ const UserDashboardScreen = () => {
             end={{ x: 1, y: 1 }}
             style={styles.ctaGradient}
           >
-            <Text style={styles.ctaIcon}>📸</Text>
-            <Text style={styles.ctaText}>MƯỢN / TRẢ</Text>
-            <Text style={styles.ctaSub}>Quét mã QR hộp kit</Text>
+            <Text style={styles.ctaIcon}>📷</Text>
+            <Text style={styles.ctaText}>QUÉT MÃ QR KIT</Text>
+            <Text style={styles.ctaSub}>Quét → xem linh kiện → mượn ngay</Text>
           </LinearGradient>
         </TouchableOpacity>
 

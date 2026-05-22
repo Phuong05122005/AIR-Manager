@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, FONT_SIZES, RADIUS, SHADOWS, SPACING } from '../theme/theme';
@@ -22,6 +22,8 @@ const KitSetupScreen = () => {
   const [newKitName, setNewKitName] = useState('');
   const [newKitTopic, setNewKitTopic] = useState('');
   const [newKitComponentsStr, setNewKitComponentsStr] = useState('');
+  // QR Modal state
+  const [qrKit, setQrKit] = useState(null);
 
   const handleDeleteKit = (id, kitName) => {
     Alert.alert(
@@ -152,10 +154,10 @@ const KitSetupScreen = () => {
 
               <TouchableOpacity 
                 style={[styles.actionBtn, styles.printBtn]}
-                onPress={() => Alert.alert('In Mã QR', `Đã tạo mã QR cho ${kit.name}`)}
+                onPress={() => setQrKit(kit)}
               >
-                <Text style={styles.actionBtnIcon}>🖨️</Text>
-                <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>In QR</Text>
+                <Text style={styles.actionBtnIcon}>🔳</Text>
+                <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Xem QR</Text>
               </TouchableOpacity>
 
               {/* Nút xóa hộp kit */}
@@ -228,6 +230,44 @@ const KitSetupScreen = () => {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* MODAL XEM QR CODE — dùng api.qrserver.com, không cần cài thêm package */}
+      <Modal visible={!!qrKit} transparent animationType="fade" onRequestClose={() => setQrKit(null)}>
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrContainer}>
+            <Text style={styles.qrTitle}>🔳 Mã QR Hộp Kit</Text>
+            <Text style={styles.qrKitName}>{qrKit?.name}</Text>
+            <Text style={styles.qrKitTopic}>{qrKit?.topic}</Text>
+
+            {qrKit?.qrToken ? (
+              <View style={styles.qrBox}>
+                <Image
+                  source={{
+                    uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrKit.qrToken)}&color=1772D2&bgcolor=FFFFFF&margin=10`,
+                  }}
+                  style={styles.qrImage}
+                  resizeMode="contain"
+                />
+                <Text style={styles.qrTokenLabel}>QR Token:</Text>
+                <Text style={styles.qrTokenText} selectable>
+                  {qrKit.qrToken}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.qrBox}>
+                <Text style={{ fontSize: 48, marginBottom: 8 }}>⚠️</Text>
+                <Text style={{ color: COLORS.danger, textAlign: 'center', fontWeight: '600' }}>
+                  Hộp kit này chưa có QR Token.{"\n"}Chạy: node scripts/migrateQrTokens.js
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.qrCloseBtn} onPress={() => setQrKit(null)}>
+              <Text style={styles.qrCloseBtnText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
     </SafeAreaView>
@@ -305,6 +345,23 @@ const styles = StyleSheet.create({
   modalBtnSave: { backgroundColor: COLORS.primary },
   modalBtnCancelText: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textSecondary },
   modalBtnSaveText: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.white },
+
+  // QR Modal Styles
+  qrOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
+  qrContainer: {
+    backgroundColor: COLORS.white, borderRadius: RADIUS.xl,
+    padding: SPACING.xl, alignItems: 'center', width: '100%', maxWidth: 360,
+    ...SHADOWS.lg,
+  },
+  qrTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.xs },
+  qrKitName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.primary, marginBottom: 2 },
+  qrKitTopic: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: SPACING.lg },
+  qrBox: { alignItems: 'center', padding: SPACING.lg, backgroundColor: '#F0F7FF', borderRadius: RADIUS.lg, width: '100%', marginBottom: SPACING.lg },
+  qrImage: { width: 200, height: 200, borderRadius: RADIUS.md },
+  qrTokenLabel: { fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, marginTop: SPACING.md, textTransform: 'uppercase' },
+  qrTokenText: { fontSize: 11, color: COLORS.textPrimary, fontFamily: 'monospace', textAlign: 'center', marginTop: 4 },
+  qrCloseBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.round, paddingHorizontal: SPACING.xxl, paddingVertical: SPACING.md },
+  qrCloseBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
 });
 
 export default KitSetupScreen;

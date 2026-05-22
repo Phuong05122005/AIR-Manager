@@ -17,6 +17,7 @@ import UserManagementScreen from '../screens/UserManagementScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import KitComponentsScreen from '../screens/KitComponentsScreen';
 import BorrowScreen from '../screens/BorrowScreen';
+import QRScanScreen from '../screens/QRScanScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -126,6 +127,7 @@ const AppNavigator = () => {
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="KitComponents" component={KitComponentsScreen} />
             <Stack.Screen name="Borrow" component={BorrowScreen} />
+            <Stack.Screen name="QRScan" component={QRScanScreen} />
           </>
         )}
       </Stack.Navigator>

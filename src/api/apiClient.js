@@ -43,23 +43,15 @@ const getDevServerIp = () => {
 
 const devIp = getDevServerIp();
 const productionApiUrl = Constants.expoConfig?.extra?.apiUrl || Constants.manifest?.extra?.apiUrl;
-const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
-const isProductionBuild = !isDev;
-const BASE_URL = isProductionBuild && productionApiUrl
-  ? productionApiUrl
-  : `http://${devIp || DEFAULT_IP}:5000/api`;
 
-if (isProductionBuild && !productionApiUrl) {
-  console.warn(
-    '⚠️ Production build đang dùng fallback local. Vui lòng cập nhật app.json expo.extra.apiUrl với backend production.'
-  );
-}
+// Ép cứng địa chỉ API chạy bằng Render kể cả trên máy ảo/điện thoại (Expo Go)
+const BASE_URL = 'https://air-manager-api.onrender.com/api';
 
 console.log(`🔌 Kết nối API tới địa chỉ: ${BASE_URL}`);
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000, // 10 giây timeout
+  timeout: 60000, // 60 giây timeout (để server Render có thời gian wake up)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -116,6 +108,8 @@ export const userApi = {
 export const kitApi = {
   getAll: () => apiClient.get('/kits'),
   getById: (id) => apiClient.get(`/kits/${id}`),
+  // ─── Tra cứu kit bằng QR Token cố định (dùng sau khi quét QR) ────────────
+  getByQrToken: (token) => apiClient.get(`/kits/qr/${token}`),
   create: (data) => apiClient.post('/kits', data),
   update: (id, data) => apiClient.put(`/kits/${id}`, data),
   delete: (id, operator) => apiClient.delete(`/kits/${id}`, { params: { operator } }),

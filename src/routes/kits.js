@@ -1,14 +1,16 @@
 /**
  * routes/kits.js — RESTful API cho Hộp Kit
- * GET    /api/kits       — Lấy danh sách hộp kit
- * GET    /api/kits/:id   — Lấy chi tiết 1 hộp kit
- * POST   /api/kits       — Tạo hộp kit mới (lưu log CREATE_KIT)
- * PUT    /api/kits/:id   — Cập nhật hộp kit / linh kiện trong hộp kit (lưu log UPDATE_KIT/UPDATE_COMPONENTS kèm snapshot cũ)
- * DELETE /api/kits/:id   — Xóa hộp kit (lưu log DELETE_KIT kèm snapshot để bảo toàn dữ liệu)
+ * GET    /api/kits            — Lấy danh sách hộp kit
+ * GET    /api/kits/:id        — Lấy chi tiết 1 hộp kit
+ * GET    /api/kits/qr/:token  — Tra cứu hộp kit bằng QR Token cố định [DÙNG ĐỂ QUÉT QR]
+ * POST   /api/kits            — Tạo hộp kit mới (tự sinh qrToken, lưu log CREATE_KIT)
+ * PUT    /api/kits/:id        — Cập nhật hộp kit / linh kiện (KHÔNG đổi qrToken)
+ * DELETE /api/kits/:id        — Xóa hộp kit (lưu log DELETE_KIT kèm snapshot)
  */
 
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto'); // Built-in Node.js — sinh UUID không cần cài package
 const Kit = require('../models/Kit');
 const AuditLog = require('../models/AuditLog');
 const { assignCodesToComponents } = require('../utils/componentCode');
@@ -37,7 +39,22 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// ─── POST /api/kits — Tạo hộp kit mới ───────────────────────────────────────────
+// ─── GET /api/kits/qr/:token — Tra cứu hộp kit bằng QR Token (DÙNG KHI QUÉT QR) ──
+// ⚠️ PHẢI đặt TRƯỚC /:id để tránh bị match nhầm sang GET /:id
+router.get('/qr/:token', async (req, res, next) => {
+  try {
+    const kit = await Kit.findOne({ qrToken: req.params.token });
+    if (!kit) {
+      res.status(404);
+      throw new Error('Không tìm thấy hộp kit với mã QR này. Mã có thể không hợp lệ.');
+    }
+    res.json({ success: true, data: kit });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── POST /api/kits — Tạo hộp kit mới (tự sinh qrToken) ─────────────────────────
 router.post('/', async (req, res, next) => {
   try {
     const { name, topic, status, components, operator } = req.body;
@@ -46,6 +63,8 @@ router.post('/', async (req, res, next) => {
       name,
       topic,
       status: status || 'Sẵn sàng',
+      // ─── QR Token cố định: sinh 1 lần, không bao giờ thay đổi ─────────────
+      qrToken: crypto.randomUUID(),
       components: assignCodesToComponents(components || []),
     });
 
@@ -56,7 +75,7 @@ router.post('/', async (req, res, next) => {
       actionType: 'CREATE_KIT',
       targetType: 'KIT',
       targetId: saved._id.toString(),
-      description: `Đã tạo mới hộp kit "${saved.name}" (chủ đề: ${saved.topic})`,
+      description: `Đã tạo mới hộp kit "${saved.name}" (chủ đề: ${saved.topic}) — QR Token: ${saved.qrToken}`,
       operator: operator || 'Quản trị viên',
       details: saved
     });
