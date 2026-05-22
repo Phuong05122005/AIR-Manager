@@ -1,25 +1,16 @@
 /**
- * routes/kits.js — RESTful API cho Hộp Kit
- *
- * THỨ TỰ ROUTE QUAN TRỌNG — Routes cụ thể PHẢI đặt TRƯỚC routes có tham số (:id)
- *
- * GET    /api/kits                — Lấy danh sách hộp kit
- * GET    /api/kits/qr/:token      — [QR SCAN] Tra cứu kit bằng QR Token cố định
- * POST   /api/kits/migrate-tokens — [ADMIN] Sinh qrToken cho tất cả kit cũ
- * GET    /api/kits/:id            — Lấy chi tiết 1 hộp kit
- * POST   /api/kits                — Tạo hộp kit mới (tự sinh qrToken)
- * PUT    /api/kits/:id            — Cập nhật hộp kit (KHÔNG đổi qrToken)
- * DELETE /api/kits/:id            — Xóa hộp kit
+ * routes/kits.js
+ * THU TU ROUTE QUAN TRONG: cac route cu the phai dat TRUOC /:id
  */
 
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto'); // Built-in Node.js — không cần cài package
+const crypto = require('crypto');
 const Kit = require('../models/Kit');
 const AuditLog = require('../models/AuditLog');
 const { assignCodesToComponents } = require('../utils/componentCode');
 
-// ─── GET /api/kits — Lấy danh sách tất cả hộp kit ───────────────────────────
+// GET /api/kits
 router.get('/', async (req, res, next) => {
   try {
     const kits = await Kit.find().sort({ createdAt: -1 });
@@ -29,14 +20,13 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// ─── GET /api/kits/qr/:token — Tra cứu kit bằng QR Token ────────────────────
-// ⚠️ PHẢI đặt TRƯỚC /:id — nếu không Express sẽ nhầm "qr" là một _id
+// GET /api/kits/qr/:token — PHAI DAT TRUOC /:id
 router.get('/qr/:token', async (req, res, next) => {
   try {
     const kit = await Kit.findOne({ qrToken: req.params.token });
     if (!kit) {
       res.status(404);
-      throw new Error('Không tìm thấy hộp kit với mã QR này.');
+      throw new Error('Khong tim thay hop kit voi ma QR nay.');
     }
     res.json({ success: true, data: kit });
   } catch (error) {
@@ -44,8 +34,7 @@ router.get('/qr/:token', async (req, res, next) => {
   }
 });
 
-// ─── POST /api/kits/migrate-tokens — Sinh qrToken cho kit cũ chưa có ────────
-// Gọi 1 lần từ trình duyệt: POST https://air-manager-api.onrender.com/api/kits/migrate-tokens
+// POST /api/kits/migrate-tokens — sinh qrToken cho kit cu, PHAI DAT TRUOC /:id
 router.post('/migrate-tokens', async (req, res, next) => {
   try {
     const kitsWithoutToken = await Kit.find({
@@ -59,7 +48,7 @@ router.post('/migrate-tokens', async (req, res, next) => {
     if (kitsWithoutToken.length === 0) {
       return res.json({
         success: true,
-        message: 'Tất cả hộp kit đã có qrToken. Không cần migration.',
+        message: 'Tat ca hop kit da co qrToken.',
         updated: 0,
       });
     }
@@ -73,7 +62,7 @@ router.post('/migrate-tokens', async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Đã sinh qrToken cho ${results.length} hộp kit thành công!`,
+      message: `Da sinh qrToken cho ${results.length} hop kit thanh cong!`,
       updated: results.length,
       data: results,
     });
@@ -82,13 +71,13 @@ router.post('/migrate-tokens', async (req, res, next) => {
   }
 });
 
-// ─── GET /api/kits/:id — Lấy chi tiết 1 hộp kit ─────────────────────────────
+// GET /api/kits/:id
 router.get('/:id', async (req, res, next) => {
   try {
     const kit = await Kit.findById(req.params.id);
     if (!kit) {
       res.status(404);
-      throw new Error('Không tìm thấy hộp kit');
+      throw new Error('Khong tim thay hop kit');
     }
     res.json({ success: true, data: kit });
   } catch (error) {
@@ -96,7 +85,7 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// ─── POST /api/kits — Tạo hộp kit mới (tự sinh qrToken cố định) ─────────────
+// POST /api/kits
 router.post('/', async (req, res, next) => {
   try {
     const { name, topic, status, components, operator } = req.body;
@@ -104,8 +93,8 @@ router.post('/', async (req, res, next) => {
     const kit = new Kit({
       name,
       topic,
-      status: status || 'Sẵn sàng',
-      qrToken: crypto.randomUUID(), // Sinh 1 lần, không bao giờ thay đổi
+      status: status || 'San sang',
+      qrToken: crypto.randomUUID(),
       components: assignCodesToComponents(components || []),
     });
 
@@ -115,8 +104,8 @@ router.post('/', async (req, res, next) => {
       actionType: 'CREATE_KIT',
       targetType: 'KIT',
       targetId: saved._id.toString(),
-      description: `Đã tạo mới hộp kit "${saved.name}" (chủ đề: ${saved.topic}) — QR: ${saved.qrToken}`,
-      operator: operator || 'Quản trị viên',
+      description: `Da tao moi hop kit "${saved.name}" - QR: ${saved.qrToken}`,
+      operator: operator || 'Quan tri vien',
       details: saved
     });
     await log.save();
@@ -125,13 +114,13 @@ router.post('/', async (req, res, next) => {
   } catch (error) {
     if (error.code === 11000) {
       res.status(400);
-      error.message = 'Tên hộp kit này đã tồn tại trên hệ thống';
+      error.message = 'Ten hop kit nay da ton tai tren he thong';
     }
     next(error);
   }
 });
 
-// ─── PUT /api/kits/:id — Cập nhật hộp kit (KHÔNG đổi qrToken) ───────────────
+// PUT /api/kits/:id
 router.put('/:id', async (req, res, next) => {
   try {
     const { name, topic, status, components, operator } = req.body;
@@ -139,7 +128,7 @@ router.put('/:id', async (req, res, next) => {
     const kit = await Kit.findById(req.params.id);
     if (!kit) {
       res.status(404);
-      throw new Error('Không tìm thấy hộp kit để chỉnh sửa');
+      throw new Error('Khong tim thay hop kit de chinh sua');
     }
 
     const oldSnapshot = JSON.parse(JSON.stringify(kit));
@@ -148,15 +137,15 @@ router.put('/:id', async (req, res, next) => {
     if (topic !== undefined) kit.topic = topic;
     if (status !== undefined) kit.status = status;
     if (components !== undefined) kit.components = assignCodesToComponents(components);
-    // qrToken KHÔNG được thay đổi ở đây
+    // qrToken KHONG thay doi
 
     const updated = await kit.save();
 
     let actionType = 'UPDATE_KIT';
-    let changeDesc = `Đã cập nhật thông tin hộp kit "${updated.name}"`;
+    let changeDesc = `Da cap nhat thong tin hop kit "${updated.name}"`;
     if (components !== undefined) {
       actionType = 'UPDATE_COMPONENTS';
-      changeDesc = `Đã cập nhật danh sách linh kiện của hộp kit "${updated.name}" (${updated.components.length} linh kiện)`;
+      changeDesc = `Da cap nhat linh kien cua hop kit "${updated.name}" (${updated.components.length} linh kien)`;
     }
 
     const log = new AuditLog({
@@ -164,7 +153,7 @@ router.put('/:id', async (req, res, next) => {
       targetType: 'KIT',
       targetId: updated._id.toString(),
       description: changeDesc,
-      operator: operator || 'Quản trị viên',
+      operator: operator || 'Quan tri vien',
       details: { before: oldSnapshot, after: updated }
     });
     await log.save();
@@ -175,14 +164,14 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-// ─── DELETE /api/kits/:id — Xóa hộp kit ─────────────────────────────────────
+// DELETE /api/kits/:id
 router.delete('/:id', async (req, res, next) => {
   try {
     const { operator } = req.query;
     const kit = await Kit.findById(req.params.id);
     if (!kit) {
       res.status(404);
-      throw new Error('Không tìm thấy hộp kit để xóa');
+      throw new Error('Khong tim thay hop kit de xoa');
     }
 
     await Kit.findByIdAndDelete(req.params.id);
@@ -191,15 +180,15 @@ router.delete('/:id', async (req, res, next) => {
       actionType: 'DELETE_KIT',
       targetType: 'KIT',
       targetId: kit._id.toString(),
-      description: `Đã xóa hộp kit "${kit.name}" (chủ đề: ${kit.topic}). Dữ liệu đã lưu vào nhật ký.`,
-      operator: operator || 'Quản trị viên',
+      description: `Da xoa hop kit "${kit.name}". Du lieu da luu vao nhat ky.`,
+      operator: operator || 'Quan tri vien',
       details: kit
     });
     await log.save();
 
     res.json({
       success: true,
-      message: `Đã xóa hộp kit "${kit.name}" thành công.`
+      message: `Da xoa hop kit "${kit.name}" thanh cong.`
     });
   } catch (error) {
     next(error);
