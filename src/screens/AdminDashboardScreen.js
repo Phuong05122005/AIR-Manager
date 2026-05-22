@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { COLORS, FONT_SIZES, RADIUS, SHADOWS, SPACING } from '../theme/theme';
 import { useAuth } from '../context/AuthContext';
+import { useKit } from '../context/KitContext';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 
 // ─── Component Thẻ KPI (Bento Item) ───────────────────────────────────────────
@@ -26,51 +27,63 @@ const KPICard = ({ title, value, icon, color, style, onPress }) => {
 
 const AdminDashboardScreen = () => {
   const { user, studentAccounts, refreshUserProfile } = useAuth();
+  const { kits, fetchKits } = useKit();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [selectedAlert, setSelectedAlert] = useState(null);
+
+  const [alerts, setAlerts] = useState([]);
 
   // Tự động đồng bộ làm mới dữ liệu từ MongoDB khi mở tab Tổng quan
   React.useEffect(() => {
     if (isFocused) {
       refreshUserProfile();
+      fetchKits();
+      
+      // Fetch danh sách đang mượn để tính toán cảnh báo quá hạn
+      import('../api/apiClient').then(({ borrowApi }) => {
+        borrowApi.getAll({ status: 'borrowing' })
+          .then(res => {
+            if (res.data && res.data.success) {
+              const activeBorrows = res.data.data || [];
+              const now = new Date();
+              
+              // Lọc các phiếu mượn quá hạn
+              const overdueBorrows = activeBorrows.filter(b => new Date(b.dueDate) < now);
+              
+              const formattedAlerts = overdueBorrows.map(b => {
+                // Tính toán thời gian trễ
+                const diffMs = now - new Date(b.dueDate);
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffDays = Math.floor(diffHours / 24);
+                let delayStr = diffDays > 0 ? `Trễ ${diffDays} ngày` : `Trễ ${diffHours} tiếng`;
+                if (diffHours === 0) delayStr = 'Vừa trễ hạn';
+
+                return {
+                  id: b._id || b.id,
+                  type: 'overdue',
+                  title: `${b.kit?.name || 'Hộp Kit'} - Quá hạn trả`,
+                  studentName: b.user?.name || 'Sinh viên',
+                  studentId: b.user?.studentId || 'N/A',
+                  phone: b.user?.phone || 'Chưa cập nhật',
+                  kitName: b.kit?.name || 'Không rõ',
+                  topic: b.kit?.topic || '',
+                  timeDetail: `${delayStr} (Hạn trả: ${new Date(b.dueDate).toLocaleString('vi-VN')})`,
+                  components: b.kit?.components || []
+                };
+              });
+              
+              setAlerts(formattedAlerts);
+            }
+          })
+          .catch(err => console.error('Lỗi tải cảnh báo:', err));
+      });
     }
   }, [isFocused]);
 
-  const ALERTS_DATA = {
-    alert12: {
-      id: '12',
-      type: 'overdue',
-      title: 'Hộp Kit #12 - Quá hạn trả',
-      studentName: 'Nguyễn Văn B',
-      studentId: '123000002',
-      phone: '0901234567',
-      kitName: 'Hộp Kit Robotics #12',
-      topic: 'Nhập môn Robotics',
-      timeDetail: 'Trễ hạn: 2 tiếng (Hạn trả: 16:30 hôm nay)',
-      components: [
-        { name: 'uKit AI controller', code: 'MC-CNBUx1' },
-        { name: 'Servo', code: 'SERVOx1' },
-        { name: 'Square servo clip', code: 'C3-YLWx1' }
-      ]
-    },
-    alert04: {
-      id: '04',
-      type: 'missing',
-      title: 'Hộp Kit #04 - Báo mất đồ',
-      studentName: 'Lê Văn Cường',
-      studentId: '123000003',
-      phone: '0923456789',
-      kitName: 'Hộp Kit #04',
-      topic: 'Lập trình Python',
-      issueDetail: 'Sinh viên báo mất: Thiếu 1 module Relay 5V 1 kênh (MOD-003)',
-      components: [
-        { name: 'Relay 5V 1 kênh (Báo mất)', code: 'MOD-003', missing: true },
-        { name: 'Turning brick', code: 'C4-YLWx1' },
-        { name: 'Joint brick', code: 'C6-YLWx10' }
-      ]
-    }
-  };
+  const totalKits = kits ? kits.length : 0;
+  const borrowingKits = kits ? kits.filter(k => k.status === 'Đang mượn').length : 0;
+  const readyKits = kits ? kits.filter(k => k.status === 'Sẵn sàng').length : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -90,14 +103,14 @@ const AdminDashboardScreen = () => {
           <View style={styles.bentoRow}>
             <KPICard 
               title="Tổng hộp kit" 
-              value="120" 
+              value={totalKits.toString()} 
               icon="📦" 
               color={COLORS.primary} 
               style={{ flex: 1 }} 
             />
             <KPICard 
               title="Đang mượn" 
-              value="45" 
+              value={borrowingKits.toString()} 
               icon="🔄" 
               color={COLORS.warning} 
               style={{ flex: 1 }} 
@@ -116,7 +129,7 @@ const AdminDashboardScreen = () => {
             />
             <KPICard 
               title="Sẵn sàng" 
-              value="75" 
+              value={readyKits.toString()} 
               icon="✅" 
               color={COLORS.success} 
               style={{ flex: 1 }} 
@@ -129,29 +142,31 @@ const AdminDashboardScreen = () => {
         <View style={styles.alertCard}>
           <View style={styles.alertHeader}>
             <Text style={styles.alertIcon}>⚠️</Text>
-            <Text style={styles.alertTitle}>Cần chú ý ngay (2)</Text>
+            <Text style={styles.alertTitle}>Cần chú ý ngay ({alerts.length})</Text>
           </View>
           
           <View style={styles.alertList}>
-            <TouchableOpacity style={styles.alertItem} onPress={() => setSelectedAlert(ALERTS_DATA.alert12)}>
-              <View style={styles.alertDot} />
-              <View style={styles.alertContent}>
-                <Text style={styles.alertItemTitle}>Hộp Kit #12 - Quá hạn trả</Text>
-                <Text style={styles.alertItemSub}>SV Nguyễn Văn B - Trễ 2 tiếng</Text>
-              </View>
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity style={styles.alertItem} onPress={() => setSelectedAlert(ALERTS_DATA.alert04)}>
-              <View style={[styles.alertDot, { backgroundColor: COLORS.warning }]} />
-              <View style={styles.alertContent}>
-                <Text style={styles.alertItemTitle}>Hộp Kit #04 - Báo mất đồ</Text>
-                <Text style={styles.alertItemSub}>Thiếu 1 module Relay</Text>
-              </View>
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
+            {alerts.length > 0 ? (
+              alerts.map((alert, index) => (
+                <View key={alert.id}>
+                  <TouchableOpacity style={styles.alertItem} onPress={() => setSelectedAlert(alert)}>
+                    <View style={[styles.alertDot, { backgroundColor: alert.type === 'overdue' ? COLORS.danger : COLORS.warning }]} />
+                    <View style={styles.alertContent}>
+                      <Text style={styles.alertItemTitle}>{alert.title}</Text>
+                      <Text style={styles.alertItemSub}>
+                        {alert.type === 'overdue' ? `SV ${alert.studentName} - ${alert.timeDetail.split('(')[0]}` : alert.issueDetail}
+                      </Text>
+                    </View>
+                    <Text style={styles.arrow}>›</Text>
+                  </TouchableOpacity>
+                  {index < alerts.length - 1 && <View style={styles.divider} />}
+                </View>
+              ))
+            ) : (
+              <Text style={{ color: COLORS.textSecondary, textAlign: 'center', paddingVertical: SPACING.md }}>
+                🎉 Tuyệt vời! Hiện không có cảnh báo nào.
+              </Text>
+            )}
           </View>
         </View>
 

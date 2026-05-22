@@ -7,6 +7,7 @@ import { useKit } from '../context/KitContext';
 import { COLORS, FONT_SIZES, RADIUS, SHADOWS, SPACING } from '../theme/theme';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { assignCodesToComponents, getComponentQuantity } from '../utils/componentCode';
+import { borrowApi } from '../api/apiClient';
 
 // ─── Component hiển thị từng hộp kit (có thể mở rộng xem linh kiện) ──────────
 const KitCard = ({ kit }) => {
@@ -94,16 +95,26 @@ const UserDashboardScreen = () => {
   const { kits, loading, fetchKits } = useKit();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  const [activeBorrows, setActiveBorrows] = useState([]);
 
-  // Làm mới danh sách kits khi tab được focus
+  // Làm mới danh sách kits và trạng thái mượn khi tab được focus
   useEffect(() => {
     if (isFocused) {
       fetchKits();
+      if (user?.id) {
+        borrowApi.getAll({ user: user.id, status: 'borrowing' })
+          .then(res => {
+            if (res.data && res.data.success) {
+              setActiveBorrows(res.data.data || []);
+            }
+          })
+          .catch(err => console.error('Lỗi khi lấy danh sách mượn:', err));
+      }
     }
-  }, [isFocused]);
+  }, [isFocused, user?.id]);
 
-  // Giả lập trạng thái đang mượn
-  const activeBorrow = true;
+  const activeBorrow = activeBorrows.length > 0;
+  const currentBorrow = activeBorrow ? activeBorrows[0] : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -130,11 +141,15 @@ const UserDashboardScreen = () => {
               colors={[COLORS.primary, '#0d9488']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.ctaGradient, { paddingVertical: 24 }]}
+              style={[styles.ctaGradient, { flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'flex-start' }]}
             >
-              <Text style={[styles.ctaIcon, { fontSize: 36, marginBottom: 8 }]}>📷</Text>
-              <Text style={[styles.ctaText, { fontSize: FONT_SIZES.xl }]}>QUÉT MÃ QR KIT</Text>
-              <Text style={styles.ctaSub}>Quét mã → Xem linh kiện → Mượn/Trả ngay</Text>
+              <View style={styles.iconContainer}>
+                <Text style={{ fontSize: 28 }}>📷</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.ctaText, { fontSize: FONT_SIZES.lg }]}>QUÉT MÃ QR KIT</Text>
+                <Text style={styles.ctaSub}>Xem linh kiện & Mượn/Trả nhanh</Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -148,11 +163,15 @@ const UserDashboardScreen = () => {
               colors={['#f59e0b', '#d97706']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.ctaGradient, { paddingVertical: 24 }]}
+              style={[styles.ctaGradient, { flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'flex-start' }]}
             >
-              <Text style={[styles.ctaIcon, { fontSize: 36, marginBottom: 8 }]}>📝</Text>
-              <Text style={[styles.ctaText, { fontSize: FONT_SIZES.xl }]}>MƯỢN / TRẢ THỦ CÔNG</Text>
-              <Text style={styles.ctaSub}>Đăng ký mượn hoặc trả không cần mã QR</Text>
+              <View style={styles.iconContainer}>
+                <Text style={{ fontSize: 28 }}>📝</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.ctaText, { fontSize: FONT_SIZES.lg }]}>MƯỢN / TRẢ THỦ CÔNG</Text>
+                <Text style={styles.ctaSub}>Đăng ký không cần mã QR</Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -163,16 +182,18 @@ const UserDashboardScreen = () => {
             <Text style={styles.statusTitle}>Đang mượn</Text>
             <View style={[styles.badge, activeBorrow ? styles.badgeActive : styles.badgeInactive]}>
               <Text style={[styles.badgeText, activeBorrow ? styles.badgeTextActive : styles.badgeTextInactive]}>
-                {activeBorrow ? '1 hộp kit' : 'Trống'}
+                {activeBorrow ? `${activeBorrows.length} hộp kit` : 'Trống'}
               </Text>
             </View>
           </View>
-          {activeBorrow ? (
+          {activeBorrow && currentBorrow ? (
             <View style={styles.borrowInfo}>
               <View style={styles.borrowIconBox}><Text style={{fontSize: 24}}>📦</Text></View>
               <View style={styles.borrowDetailsBox}>
-                <Text style={styles.borrowKitName}>Hộp Kit Cơ bản #05</Text>
-                <Text style={styles.timeRemaining}>Hạn trả: 16:30 hôm nay</Text>
+                <Text style={styles.borrowKitName}>{currentBorrow.kit?.name || 'Hộp Kit'}</Text>
+                <Text style={styles.timeRemaining}>
+                  Hạn trả: {new Date(currentBorrow.dueDate).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} ngày {new Date(currentBorrow.dueDate).toLocaleDateString('vi-VN')}
+                </Text>
               </View>
             </View>
           ) : (
@@ -215,7 +236,7 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     alignSelf: 'center',
     paddingHorizontal: SPACING.xl,
-    paddingBottom: 120,
+    paddingBottom: 160,
     gap: SPACING.lg,
   },
   header: {
@@ -241,15 +262,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaIcon: {
-    fontSize: 48,
-    marginBottom: SPACING.sm,
+  iconContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 12,
+    borderRadius: 16,
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaText: {
-    fontSize: FONT_SIZES.xxl,
+    fontSize: FONT_SIZES.lg,
     fontWeight: '900',
     color: COLORS.white,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   ctaSub: {
     fontSize: FONT_SIZES.sm,
