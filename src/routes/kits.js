@@ -1,21 +1,25 @@
 /**
  * routes/kits.js — RESTful API cho Hộp Kit
- * GET    /api/kits            — Lấy danh sách hộp kit
- * GET    /api/kits/:id        — Lấy chi tiết 1 hộp kit
- * GET    /api/kits/qr/:token  — Tra cứu hộp kit bằng QR Token cố định [DÙNG ĐỂ QUÉT QR]
- * POST   /api/kits            — Tạo hộp kit mới (tự sinh qrToken, lưu log CREATE_KIT)
- * PUT    /api/kits/:id        — Cập nhật hộp kit / linh kiện (KHÔNG đổi qrToken)
- * DELETE /api/kits/:id        — Xóa hộp kit (lưu log DELETE_KIT kèm snapshot)
+ *
+ * THỨ TỰ ROUTE QUAN TRỌNG — Routes cụ thể PHẢI đặt TRƯỚC routes có tham số (:id)
+ *
+ * GET    /api/kits                — Lấy danh sách hộp kit
+ * GET    /api/kits/qr/:token      — [QR SCAN] Tra cứu kit bằng QR Token cố định
+ * POST   /api/kits/migrate-tokens — [ADMIN] Sinh qrToken cho tất cả kit cũ
+ * GET    /api/kits/:id            — Lấy chi tiết 1 hộp kit
+ * POST   /api/kits                — Tạo hộp kit mới (tự sinh qrToken)
+ * PUT    /api/kits/:id            — Cập nhật hộp kit (KHÔNG đổi qrToken)
+ * DELETE /api/kits/:id            — Xóa hộp kit
  */
 
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto'); // Built-in Node.js — sinh UUID không cần cài package
+const crypto = require('crypto'); // Built-in Node.js — không cần cài package
 const Kit = require('../models/Kit');
 const AuditLog = require('../models/AuditLog');
 const { assignCodesToComponents } = require('../utils/componentCode');
 
-// ─── GET /api/kits — Lấy danh sách tất cả hộp kit ────────────────────────────────
+// ─── GET /api/kits — Lấy danh sách tất cả hộp kit ───────────────────────────
 router.get('/', async (req, res, next) => {
   try {
     const kits = await Kit.find().sort({ createdAt: -1 });
@@ -25,7 +29,60 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// ─── GET /api/kits/:id — Lấy chi tiết 1 hộp kit ────────────────────────────────
+// ─── GET /api/kits/qr/:token — Tra cứu kit bằng QR Token ────────────────────
+// ⚠️ PHẢI đặt TRƯỚC /:id — nếu không Express sẽ nhầm "qr" là một _id
+router.get('/qr/:token', async (req, res, next) => {
+  try {
+    const kit = await Kit.findOne({ qrToken: req.params.token });
+    if (!kit) {
+      res.status(404);
+      throw new Error('Không tìm thấy hộp kit với mã QR này.');
+    }
+    res.json({ success: true, data: kit });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── POST /api/kits/migrate-tokens — Sinh qrToken cho kit cũ chưa có ────────
+// Gọi 1 lần từ trình duyệt: POST https://air-manager-api.onrender.com/api/kits/migrate-tokens
+router.post('/migrate-tokens', async (req, res, next) => {
+  try {
+    const kitsWithoutToken = await Kit.find({
+      $or: [
+        { qrToken: { $exists: false } },
+        { qrToken: null },
+        { qrToken: '' },
+      ]
+    });
+
+    if (kitsWithoutToken.length === 0) {
+      return res.json({
+        success: true,
+        message: 'Tất cả hộp kit đã có qrToken. Không cần migration.',
+        updated: 0,
+      });
+    }
+
+    const results = [];
+    for (const kit of kitsWithoutToken) {
+      kit.qrToken = crypto.randomUUID();
+      await kit.save();
+      results.push({ name: kit.name, qrToken: kit.qrToken });
+    }
+
+    res.json({
+      success: true,
+      message: `Đã sinh qrToken cho ${results.length} hộp kit thành công!`,
+      updated: results.length,
+      data: results,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── GET /api/kits/:id — Lấy chi tiết 1 hộp kit ─────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
     const kit = await Kit.findById(req.params.id);
@@ -39,22 +96,7 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// ─── GET /api/kits/qr/:token — Tra cứu hộp kit bằng QR Token (DÙNG KHI QUÉT QR) ──
-// ⚠️ PHẢI đặt TRƯỚC /:id để tránh bị match nhầm sang GET /:id
-router.get('/qr/:token', async (req, res, next) => {
-  try {
-    const kit = await Kit.findOne({ qrToken: req.params.token });
-    if (!kit) {
-      res.status(404);
-      throw new Error('Không tìm thấy hộp kit với mã QR này. Mã có thể không hợp lệ.');
-    }
-    res.json({ success: true, data: kit });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// ─── POST /api/kits — Tạo hộp kit mới (tự sinh qrToken) ─────────────────────────
+// ─── POST /api/kits — Tạo hộp kit mới (tự sinh qrToken cố định) ─────────────
 router.post('/', async (req, res, next) => {
   try {
     const { name, topic, status, components, operator } = req.body;
@@ -63,19 +105,17 @@ router.post('/', async (req, res, next) => {
       name,
       topic,
       status: status || 'Sẵn sàng',
-      // ─── QR Token cố định: sinh 1 lần, không bao giờ thay đổi ─────────────
-      qrToken: crypto.randomUUID(),
+      qrToken: crypto.randomUUID(), // Sinh 1 lần, không bao giờ thay đổi
       components: assignCodesToComponents(components || []),
     });
 
     const saved = await kit.save();
 
-    // Ghi Audit Log hành vi tạo mới
     const log = new AuditLog({
       actionType: 'CREATE_KIT',
       targetType: 'KIT',
       targetId: saved._id.toString(),
-      description: `Đã tạo mới hộp kit "${saved.name}" (chủ đề: ${saved.topic}) — QR Token: ${saved.qrToken}`,
+      description: `Đã tạo mới hộp kit "${saved.name}" (chủ đề: ${saved.topic}) — QR: ${saved.qrToken}`,
       operator: operator || 'Quản trị viên',
       details: saved
     });
@@ -91,49 +131,41 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// ─── PUT /api/kits/:id — Cập nhật hộp kit / linh kiện trong hộp kit ─────────────
+// ─── PUT /api/kits/:id — Cập nhật hộp kit (KHÔNG đổi qrToken) ───────────────
 router.put('/:id', async (req, res, next) => {
   try {
     const { name, topic, status, components, operator } = req.body;
-    
+
     const kit = await Kit.findById(req.params.id);
     if (!kit) {
       res.status(404);
       throw new Error('Không tìm thấy hộp kit để chỉnh sửa');
     }
 
-    // Lưu lại dữ liệu snapshot cũ trước khi chỉnh sửa
     const oldSnapshot = JSON.parse(JSON.stringify(kit));
 
-    // Cập nhật thông tin mới
     if (name !== undefined) kit.name = name;
     if (topic !== undefined) kit.topic = topic;
     if (status !== undefined) kit.status = status;
     if (components !== undefined) kit.components = assignCodesToComponents(components);
+    // qrToken KHÔNG được thay đổi ở đây
 
     const updated = await kit.save();
 
-    // Xác định loại thao tác ghi nhật ký
     let actionType = 'UPDATE_KIT';
     let changeDesc = `Đã cập nhật thông tin hộp kit "${updated.name}"`;
-    
-    // Nếu có sự thay đổi về danh sách linh kiện trong hộp
     if (components !== undefined) {
       actionType = 'UPDATE_COMPONENTS';
-      changeDesc = `Đã cập nhật danh sách linh kiện của hộp kit "${updated.name}" (Số lượng: ${updated.components.length} linh kiện)`;
+      changeDesc = `Đã cập nhật danh sách linh kiện của hộp kit "${updated.name}" (${updated.components.length} linh kiện)`;
     }
 
-    // Ghi Audit Log hành vi cập nhật kèm snapshot trước/sau
     const log = new AuditLog({
       actionType,
       targetType: 'KIT',
       targetId: updated._id.toString(),
       description: changeDesc,
       operator: operator || 'Quản trị viên',
-      details: {
-        before: oldSnapshot,
-        after: updated
-      }
+      details: { before: oldSnapshot, after: updated }
     });
     await log.save();
 
@@ -143,7 +175,7 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-// ─── DELETE /api/kits/:id — Xóa hộp kit (LƯU LẠI SNAPSHOT PHỤC VỤ TRUY VẤN LỊCH SỬ) ─
+// ─── DELETE /api/kits/:id — Xóa hộp kit ─────────────────────────────────────
 router.delete('/:id', async (req, res, next) => {
   try {
     const { operator } = req.query;
@@ -153,23 +185,21 @@ router.delete('/:id', async (req, res, next) => {
       throw new Error('Không tìm thấy hộp kit để xóa');
     }
 
-    // Xóa hộp kit khỏi collection chính
     await Kit.findByIdAndDelete(req.params.id);
 
-    // Ghi Audit Log hành vi Xóa kèm theo TOÀN BỘ snapshot dữ liệu hộp kit (để không bị mất dữ liệu)
     const log = new AuditLog({
       actionType: 'DELETE_KIT',
       targetType: 'KIT',
       targetId: kit._id.toString(),
-      description: `Đã xóa hộp kit "${kit.name}" (chủ đề: ${kit.topic}). Toàn bộ danh sách linh kiện đã được lưu trữ trong nhật ký hệ thống.`,
+      description: `Đã xóa hộp kit "${kit.name}" (chủ đề: ${kit.topic}). Dữ liệu đã lưu vào nhật ký.`,
       operator: operator || 'Quản trị viên',
-      details: kit // Chứa đầy đủ danh sách linh kiện cũ của hộp kit bị xóa!
+      details: kit
     });
     await log.save();
 
-    res.json({ 
-      success: true, 
-      message: `Đã xóa hộp kit "${kit.name}" thành công và sao lưu dữ liệu vào nhật ký hệ thống.` 
+    res.json({
+      success: true,
+      message: `Đã xóa hộp kit "${kit.name}" thành công.`
     });
   } catch (error) {
     next(error);
