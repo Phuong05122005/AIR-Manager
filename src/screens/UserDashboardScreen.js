@@ -118,23 +118,44 @@ const UserDashboardScreen = () => {
           <Text style={styles.name}>{user.name}</Text>
         </View>
 
-        {/* Nút Quét QR → Mượn Kit */}
-        <TouchableOpacity 
-          style={styles.ctaButtonWrapper}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('QRScan')}
-        >
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.teal]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.ctaGradient}
+        {/* Khối Nút Hành Động */}
+        <View style={{ gap: SPACING.md, marginBottom: SPACING.lg }}>
+          {/* Nút 1: Quét QR */}
+          <TouchableOpacity 
+            style={[styles.ctaButtonWrapper, { marginHorizontal: 0, marginBottom: 0 }]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('QRScan')}
           >
-            <Text style={styles.ctaIcon}>📷</Text>
-            <Text style={styles.ctaText}>QUÉT MÃ QR KIT</Text>
-            <Text style={styles.ctaSub}>Quét → xem linh kiện → mượn ngay</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={[COLORS.primary, '#0d9488']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.ctaGradient, { paddingVertical: 24 }]}
+            >
+              <Text style={[styles.ctaIcon, { fontSize: 36, marginBottom: 8 }]}>📷</Text>
+              <Text style={[styles.ctaText, { fontSize: FONT_SIZES.xl }]}>QUÉT MÃ QR KIT</Text>
+              <Text style={styles.ctaSub}>Quét mã → Xem linh kiện → Mượn/Trả ngay</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Nút 2: Thủ công */}
+          <TouchableOpacity 
+            style={[styles.ctaButtonWrapper, { marginHorizontal: 0, marginBottom: 0 }]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Borrow')}
+          >
+            <LinearGradient
+              colors={['#f59e0b', '#d97706']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.ctaGradient, { paddingVertical: 24 }]}
+            >
+              <Text style={[styles.ctaIcon, { fontSize: 36, marginBottom: 8 }]}>📝</Text>
+              <Text style={[styles.ctaText, { fontSize: FONT_SIZES.xl }]}>MƯỢN / TRẢ THỦ CÔNG</Text>
+              <Text style={styles.ctaSub}>Đăng ký mượn hoặc trả không cần mã QR</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
         {/* Thẻ trạng thái đang mượn */}
         <View style={styles.statusCard}>

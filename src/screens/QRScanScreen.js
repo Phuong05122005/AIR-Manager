@@ -27,6 +27,8 @@ const formatDate = (date) => {
 const KitResultModal = ({ visible, kit, onClose, onBorrowSuccess }) => {
   const { user, role } = useAuth();
   const [borrowing, setBorrowing] = useState(false);
+  const [returning, setReturning] = useState(false);
+  const [activeBorrowId, setActiveBorrowId] = useState(null);
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -45,6 +47,22 @@ const KitResultModal = ({ visible, kit, onClose, onBorrowSuccess }) => {
         }).catch(() => {});
       } else {
         setSelectedUserId(String(user?.id || user?._id || ''));
+      }
+
+      // Nếu đang mượn, tìm ID phiếu mượn để cho phép trả
+      if (kit.status === 'Đang mượn') {
+        borrowApi.getAll({ status: 'borrowed' }).then(res => {
+          const borrows = res.data.data;
+          const active = borrows.find(b => String(b.kit?._id || b.kit) === String(kit._id));
+          if (active) {
+            // Admin hoặc chính người mượn mới được trả
+            if (role === 'admin' || String(active.user?._id || active.user) === String(user?.id || user?._id)) {
+              setActiveBorrowId(active._id);
+            }
+          }
+        }).catch(console.error);
+      } else {
+        setActiveBorrowId(null);
       }
     }
   }, [visible, kit, role, user]);
@@ -74,6 +92,21 @@ const KitResultModal = ({ visible, kit, onClose, onBorrowSuccess }) => {
       Alert.alert('Lỗi', error.message);
     } finally {
       setBorrowing(false);
+    }
+  };
+
+  const handleReturn = async () => {
+    if (!activeBorrowId) return;
+    setReturning(true);
+    try {
+      await borrowApi.returnBorrow(activeBorrowId, { note: 'Trả hộp kit qua quét QR code' });
+      Alert.alert('✅ Thành công', `Đã trả hộp kit "${kit.name}" thành công!`);
+      onBorrowSuccess();
+      onClose();
+    } catch (error) {
+      Alert.alert('Lỗi', error.message);
+    } finally {
+      setReturning(false);
     }
   };
 
@@ -156,16 +189,17 @@ const KitResultModal = ({ visible, kit, onClose, onBorrowSuccess }) => {
             </View>
           )}
 
-          {/* Chọn ngày trả */}
-          <View style={styles.compSection}>
-            <Text style={styles.compSectionTitle}>📅 Ngày hẹn trả</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={dueDate}
-              onChangeText={setDueDate}
-              placeholder="YYYY-MM-DD"
-            />
-            <View style={styles.quickDates}>
+          {/* Chọn ngày trả (chỉ hiện khi kit sẵn sàng) */}
+          {kit.status === 'Sẵn sàng' && (
+            <View style={styles.compSection}>
+              <Text style={styles.compSectionTitle}>📅 Ngày hẹn trả</Text>
+              <TextInput
+                style={styles.dateInput}
+                value={dueDate}
+                onChangeText={setDueDate}
+                placeholder="YYYY-MM-DD"
+              />
+              <View style={styles.quickDates}>
               {[3, 7, 14, 30].map(days => {
                 const d = new Date();
                 d.setDate(d.getDate() + days);
@@ -185,22 +219,38 @@ const KitResultModal = ({ visible, kit, onClose, onBorrowSuccess }) => {
               })}
             </View>
           </View>
+          )}
 
-          {/* Nút mượn */}
-          <TouchableOpacity
-            style={[styles.borrowBtn, !canBorrow && styles.borrowBtnDisabled]}
-            onPress={handleBorrow}
-            disabled={!canBorrow || borrowing}
-            activeOpacity={0.85}
-          >
-            {borrowing ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.borrowBtnText}>
-                {canBorrow ? '📥 Mượn hộp kit này' : `Không thể mượn (${kit.status})`}
-              </Text>
-            )}
-          </TouchableOpacity>
+          {/* Nút mượn / trả */}
+          {kit.status === 'Đang mượn' && activeBorrowId ? (
+            <TouchableOpacity
+              style={[styles.borrowBtn, { backgroundColor: COLORS.success }]}
+              onPress={handleReturn}
+              disabled={returning}
+              activeOpacity={0.85}
+            >
+              {returning ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.borrowBtnText}>✅ Trả lại hộp kit này</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.borrowBtn, !canBorrow && styles.borrowBtnDisabled]}
+              onPress={handleBorrow}
+              disabled={!canBorrow || borrowing}
+              activeOpacity={0.85}
+            >
+              {borrowing ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.borrowBtnText}>
+                  {canBorrow ? '📥 Mượn hộp kit này' : `Không thể mượn (${kit.status})`}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>

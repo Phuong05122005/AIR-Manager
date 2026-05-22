@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, FONT_SIZES, RADIUS, SHADOWS, SPACING } from '../theme/theme';
@@ -263,9 +263,26 @@ const KitSetupScreen = () => {
               </View>
             )}
 
-            <TouchableOpacity style={styles.qrCloseBtn} onPress={() => setQrKit(null)}>
-              <Text style={styles.qrCloseBtnText}>Đóng</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md }}>
+              <TouchableOpacity 
+                style={[styles.qrCloseBtn, { backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border }]} 
+                onPress={() => setQrKit(null)}
+              >
+                <Text style={[styles.qrCloseBtnText, { color: COLORS.textPrimary }]}>Đóng</Text>
+              </TouchableOpacity>
+              
+              {qrKit?.qrToken && (
+                <TouchableOpacity 
+                  style={[styles.qrCloseBtn, { flex: 1, backgroundColor: COLORS.primary }]} 
+                  onPress={() => {
+                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrKit.qrToken)}&color=1772D2&bgcolor=FFFFFF&margin=10`;
+                    Linking.openURL(qrUrl);
+                  }}
+                >
+                  <Text style={styles.qrCloseBtnText}>🖨️ Lưu / In Mã QR</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </Modal>
